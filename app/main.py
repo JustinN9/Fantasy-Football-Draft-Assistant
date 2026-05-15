@@ -5,7 +5,15 @@ from engine.vbd import calculate_vbd
 from models.draft_state import DraftState
 from engine.recommendations import get_recommendations
 
+from simulation.snake_draft import SnakeDraftSimulator
+from models.draft_state import DraftState
+
+from engine.positional_runs import detect_positional_runs
+
 draft_state = DraftState()
+
+runs = detect_positional_runs(draft_state)
+
 
 df = pd.read_csv("data/players.csv")
 
@@ -29,24 +37,31 @@ for _, row in df.iterrows():
 for player in players:
     player.vbd = calculate_vbd(player)
 
-print(f"Loaded {len(players)} players")
+#print(f"Loaded {len(players)} players")
+#print("\nPLAYER VBD VALUES\n")
+#for player in players:
+#    print(
+#        f"{player.name:20} "
+#        f"{player.position:3} "
+#        f"Proj: {player.projected_points:5} "
+#        f"VBD: {player.vbd:5.1f}"
+#    )
 
-print("\nPLAYER VBD VALUES\n")
+simulator = SnakeDraftSimulator(
+    players=players,
+    draft_state=draft_state,
+    num_teams=10
+)
 
-for player in players:
-    print(
-        f"{player.name:20} "
-        f"{player.position:3} "
-        f"Proj: {player.projected_points:5} "
-        f"VBD: {player.vbd:5.1f}"
-    )
+# simulate 3 rounds first
+for _ in range(3):
+    simulator.simulate_pick()
+    if runs:
+        print("\nPOSITIONAL RUN ALERTS:")
+        for pos, level in runs.items():
+            print(f"- {pos}: {level}")
 
-draft_state.draft_player(players[0])  # simulate CMC gone
-draft_state.draft_player(players[1])  # simulate Bijan gone
-
-recommendations = get_recommendations(players, draft_state)
-
-print("\nTOP RECOMMENDATIONS (ADJUSTED FOR DRAFT STATE)\n")
-
-for i, (player, score) in enumerate(recommendations, 1):
-    print(f"{i}. {player.name} - {score:.2f}")
+#recommendations = get_recommendations(players, draft_state)
+#print("\nTOP RECOMMENDATIONS (ADJUSTED FOR DRAFT STATE)\n")
+#for i, (player, score) in enumerate(recommendations, 1):
+#    print(f"{i}. {player.name} - {score:.2f}")
