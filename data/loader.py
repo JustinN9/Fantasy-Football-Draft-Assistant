@@ -1,6 +1,6 @@
 import pandas as pd
 from models.player import Player
-
+from engine.vbd import calculate_vbd
 
 def load_players(path="data/players.csv"):
     try:
@@ -22,6 +22,7 @@ def load_players(path="data/players.csv"):
                 risk=int(row["risk"]),
                 tier=int(row["tier"])
             )
+            player.vbd = calculate_vbd(player)
             players.append(player)
 
         except KeyError as e:
