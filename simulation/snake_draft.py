@@ -1,4 +1,5 @@
 import random
+import math
 from engine.cpu_logic import cpu_score
 
 class SnakeDraftSimulator:
@@ -42,9 +43,9 @@ class SnakeDraftSimulator:
                 for p in self.available_players:
                     score = cpu_score(p, self.draft_state, self.current_pick)
 
-                if score > best_score:
-                    best_score = score
-                    best_player = p
+                    if score > best_score:
+                        best_score = score
+                        best_player = p
 
                 player = best_player
 

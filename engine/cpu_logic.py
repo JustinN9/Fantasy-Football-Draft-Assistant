@@ -1,22 +1,21 @@
+import random
+
 def cpu_score(player, draft_state, current_pick):
-    score = player.projected_points * 0.5
+    score = player.projected_points * 0.6  # slightly stronger signal
 
-    # ADP pressure (players "should" go around their ADP)
-    adp_pressure = max(0, 100 - abs(player.adp - current_pick))
-    score += adp_pressure * 0.3
+    adp_pressure = max(0, 120 - abs(player.adp - current_pick))
+    score += adp_pressure * 0.4
 
-    # positional scarcity (basic version)
     position_need = {
         "QB": 1.0,
-        "RB": 1.2,
-        "WR": 1.2,
-        "TE": 1.0
+        "RB": 1.25,
+        "WR": 1.25,
+        "TE": 1.05
     }
 
     score *= position_need[player.position]
 
-    # small randomness so drafts aren't identical
-    import random
-    score += random.uniform(-10, 10)
+    # IMPORTANT: move randomness earlier (not just additive noise)
+    score *= random.uniform(0.92, 1.08)
 
     return score

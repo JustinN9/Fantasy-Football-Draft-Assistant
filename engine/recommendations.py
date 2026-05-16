@@ -7,7 +7,7 @@ def get_recommendations(players, draft_state, top_n=5):
     ]
 
     scored = [
-        (p, calculate_draft_score(p, draft_state))
+        (p, calculate_draft_score(p, draft_state, players))
         for p in available
     ]
 

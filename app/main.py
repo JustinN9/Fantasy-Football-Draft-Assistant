@@ -9,6 +9,7 @@ from simulation.snake_draft import SnakeDraftSimulator
 from models.draft_state import DraftState
 
 from engine.positional_runs import detect_positional_runs
+from engine.scoring import calculate_draft_score
 
 draft_state = DraftState()
 
@@ -53,9 +54,15 @@ simulator = SnakeDraftSimulator(
     num_teams=10
 )
 
+print("\nCALIBRATION VIEW\n")
+for p in sorted(players, key=lambda x: x.projected_points, reverse=True)[:10]:
+    score = calculate_draft_score(p, draft_state, players)
+    print(f"{p.name:20} PROJ:{p.projected_points} SCORE:{score:.2f}")
+
 # simulate 3 rounds first
 for _ in range(3):
     simulator.simulate_pick()
+
     if runs:
         print("\nPOSITIONAL RUN ALERTS:")
         for pos, level in runs.items():
@@ -65,3 +72,8 @@ for _ in range(3):
 #print("\nTOP RECOMMENDATIONS (ADJUSTED FOR DRAFT STATE)\n")
 #for i, (player, score) in enumerate(recommendations, 1):
 #    print(f"{i}. {player.name} - {score:.2f}")
+
+print("\nCALIBRATION VIEW\n")
+for p in sorted(players, key=lambda x: x.projected_points, reverse=True)[:10]:
+    score = calculate_draft_score(p, draft_state, players)
+    print(f"{p.name:20} PROJ:{p.projected_points} SCORE:{score:.2f}")
