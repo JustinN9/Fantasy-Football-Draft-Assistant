@@ -1,17 +1,26 @@
-from collections import deque
+def detect_positional_runs(draft_state):
 
-def detect_positional_runs(draft_state, window=10):
-    """
-    Looks at last N picks and detects if a position is being over-drafted.
-    """
+    history = draft_state.pick_history
+    total_picks = len(history)
 
-    if len(draft_state.pick_history) < window:
+    if total_picks < 8:
         return {}
 
-    recent = draft_state.pick_history[-window:]
+    # Dynamic window sizing for stability
+    if total_picks < 30:
+        window = 6
+    elif total_picks < 80:
+        window = 10
+    else:
+        window = 14
 
+    recent = history[-window:]
+
+    # Count positions safely
     counts = {}
-    for pos in recent:
+
+    for item in recent:
+        pos = item.position if hasattr(item, "position") else item
         counts[pos] = counts.get(pos, 0) + 1
 
     total = len(recent)
@@ -21,10 +30,12 @@ def detect_positional_runs(draft_state, window=10):
     for pos, count in counts.items():
         share = count / total
 
-        # thresholds tuned for fantasy drafts
-        if share >= 0.40:
+        # Smoothed thresholds
+        if share >= 0.45:
             run_signals[pos] = "HOT_RUN"
-        elif share >= 0.25:
+        elif share >= 0.30:
             run_signals[pos] = "MODERATE_RUN"
+        elif share >= 0.18:
+            run_signals[pos] = "ACTIVE"
 
     return run_signals

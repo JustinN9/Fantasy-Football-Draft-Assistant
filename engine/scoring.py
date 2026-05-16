@@ -1,41 +1,52 @@
-from engine.config import SCORING_WEIGHTS
+from engine.config import SCORING_PROFILES
 from engine.positional_runs import detect_positional_runs
 
+
 def get_replacement_value(players, position):
+
     candidates = [p for p in players if p.position == position]
 
     if not candidates:
         return 0
 
-    best = max(candidates, key=lambda p: p.projected_points)
-    return best.projected_points
+    return max(candidates, key=lambda p: p.projected_points).projected_points
+
 
 def calculate_draft_score(player, draft_state, all_players):
-    w = SCORING_WEIGHTS
 
+    w = SCORING_PROFILES["default"]
+
+    # Base Value Component
     base = (
         player.vbd * w["vbd_weight"]
         + player.upside * w["upside_weight"]
         - player.risk * w["risk_weight"]
     )
 
-    # scarcity
+    # Scarcity Component
     drafted_same_position = sum(
         1 for p in draft_state.drafted_players
         if p.position == player.position
     )
+
     scarcity_bonus = drafted_same_position * w["scarcity_weight"]
 
-    # ADP alignment (new realism layer)
-    adp_pressure = max(0, 100 - abs(player.adp - draft_state.current_pick))
-    adp_bonus = adp_pressure * w["adp_weight"]
+    # ADP Pressure
+    adp_diff = abs(player.adp - draft_state.current_pick)
+    adp_pressure = max(0, 1 - (adp_diff / 80))  # 0–1 scale
 
-    # opportunity cost (replacement value logic)
+    adp_bonus = adp_pressure * 40 * w["adp_weight"]
+
+    # Opportunity Cost
     replacement = get_replacement_value(all_players, player.position)
-    opportunity = (player.projected_points - replacement) * w["opportunity_weight"]
 
-    # positional runs
+    opportunity = (
+        player.projected_points - replacement
+    ) * w["opportunity_weight"]
+
+    # Positional Runs
     runs = detect_positional_runs(draft_state)
+
     run_bonus = 0
 
     if player.position in runs:
@@ -43,5 +54,8 @@ def calculate_draft_score(player, draft_state, all_players):
             run_bonus = 25
         elif runs[player.position] == "MODERATE_RUN":
             run_bonus = 10
+        elif runs[player.position] == "ACTIVE":
+            run_bonus = 5
 
+    # Final Score
     return base + scarcity_bonus + adp_bonus + opportunity + run_bonus

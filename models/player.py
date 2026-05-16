@@ -18,5 +18,4 @@ class Player:
         self.upside = float(upside)
         self.risk = float(risk)
         self.tier = int(tier)
-
-        self.vbd = 0
+        self.vbd = None

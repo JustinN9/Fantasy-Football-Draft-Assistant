@@ -5,6 +5,14 @@ REPLACEMENT_VALUES = {
     "TE": 140
 }
 
+
 def calculate_vbd(player):
-    replacement = REPLACEMENT_VALUES[player.position]
-    return player.projected_points - replacement
+
+    position = player.position
+
+    if position not in REPLACEMENT_VALUES:
+        return 0
+
+    replacement_value = REPLACEMENT_VALUES[position]
+
+    return player.projected_points - replacement_value
