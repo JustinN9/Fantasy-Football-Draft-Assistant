@@ -1,6 +1,5 @@
 from engine.recommendations import get_recommendations
 
-
 class LiveDraftAssistant:
     def __init__(self, players, draft_state):
         self.players = players

@@ -1,110 +1,231 @@
 from engine.positional_runs import detect_positional_runs
 
-# Roster Structure
-ROSTER_LIMITS = {
-    "QB": 1,
-    "RB": 2,
-    "WR": 2,
-    "TE": 1
+
+TEAM_NEED_CURVES = {
+    "QB": [1.0, 0.08, 0.01],
+    "RB": [1.0, 0.95, 0.82, 0.65, 0.42, 0.22],
+    "WR": [1.0, 0.94, 0.84, 0.70, 0.48, 0.28],
+    "TE": [1.0, 0.18, 0.04]
 }
 
-# Replacement Value
-def get_replacement_value(players, position):
-    pool = [p for p in players if p.position == position]
-    if not pool:
-        return 0
-    return max(pool, key=lambda p: p.projected_points).projected_points
 
-# Team Need Model
-def team_need(player, draft_state):
-    counts = {"QB": 0, "RB": 0, "WR": 0, "TE": 0}
+POSITION_WEIGHTS = {
+    "QB": 0.72,
+    "RB": 1.15,
+    "WR": 1.12,
+    "TE": 0.90
+}
 
-    for p in draft_state.drafted_players:
+
+def normalize(value, min_val, max_val):
+    if max_val == min_val:
+        return 50
+
+    return (
+        (value - min_val)
+        / (max_val - min_val)
+    ) * 100
+
+
+def get_team_need_modifier(
+    player,
+    draft_state,
+    team_id
+):
+    roster = draft_state.get_team_roster(team_id)
+
+    counts = {
+        "QB": 0,
+        "RB": 0,
+        "WR": 0,
+        "TE": 0
+    }
+
+    for p in roster:
         if p.position in counts:
             counts[p.position] += 1
 
-    return {
-        "QB": 1 - min(counts["QB"] / 1, 1),
-        "RB": 1 - min(counts["RB"] / 2, 1),
-        "WR": 1 - min(counts["WR"] / 2, 1),
-        "TE": 1 - min(counts["TE"] / 1, 1),
-    }.get(player.position, 0)
+    curve = TEAM_NEED_CURVES.get(
+        player.position,
+        [1.0]
+    )
 
-# Market Scarcity
-def market_scarcity(player, all_players, draft_state):
+    count = counts[player.position]
+
+    if count >= len(curve):
+        return curve[-1]
+
+    return curve[count]
+
+
+def talent_score(player, all_players):
+
+    vbds = [
+        p.vbd
+        for p in all_players
+        if p.vbd is not None
+    ]
+
+    vbd_norm = normalize(
+        player.vbd,
+        min(vbds),
+        max(vbds)
+    )
+
+    upside_score = (
+        player.upside * 10
+    )
+
+    talent = (
+        vbd_norm * 0.78
+        + upside_score * 0.22
+    )
+
+    position_weight = (
+        POSITION_WEIGHTS.get(
+            player.position,
+            1.0
+        )
+    )
+
+    talent *= position_weight
+
+    return talent
+
+
+def tier_pressure(
+    player,
+    all_players,
+    draft_state
+):
+
     remaining = [
         p for p in all_players
-        if p.position == player.position
-        and not draft_state.is_drafted(p)
+        if (
+            p.position
+            == player.position
+            and not draft_state.is_drafted(p)
+        )
     ]
 
     if not remaining:
         return 0
 
-    best_tier = min(p.tier for p in remaining)
-
-    elite_remaining = sum(
-        1 for p in remaining
-        if p.tier == best_tier
+    best_tier = min(
+        p.tier
+        for p in remaining
     )
-
-    return 1 / (elite_remaining + 1)
-
-# Tier Cliff
-def tier_cliff(players, draft_state, position):
-    remaining = [
-        p for p in players
-        if p.position == position
-        and not draft_state.is_drafted(p)
-    ]
-
-    if not remaining:
-        return 0
-
-    best_tier = min(p.tier for p in remaining)
 
     tier_count = sum(
-        1 for p in remaining
+        1
+        for p in remaining
         if p.tier == best_tier
     )
 
-    return 1 / (tier_count + 1)
+    if tier_count == 1:
+        return 8
 
-# Main Score Function
-def calculate_draft_score(player, draft_state, all_players):
+    if tier_count <= 3:
+        return 4
 
-    # Base Value
-    base = (
-        player.vbd * 0.7
-        + player.upside * 0.25
-        - player.risk * 0.2
+    return 0
+
+
+def run_bonus(
+    player,
+    draft_state
+):
+
+    runs = detect_positional_runs(
+        draft_state
     )
 
-    # Core Vlaue
-    replacement = get_replacement_value(all_players, player.position)
-    value_over_replacement = (player.projected_points - replacement) * 0.5
+    signal = runs.get(
+        player.position
+    )
 
-    # Team Need
-    need = team_need(player, draft_state)
+    bonuses = {
+        "HOT_RUN": 4,
+        "MODERATE_RUN": 2,
+        "ACTIVE": 1
+    }
 
-    # Market Scacity
-    scarcity = market_scarcity(player, all_players, draft_state)
+    return bonuses.get(
+        signal,
+        0
+    )
 
-    # Tier CLiffs
-    cliff = tier_cliff(all_players, draft_state, player.position)
 
-    # Possession Run
-    runs = detect_positional_runs(draft_state)
+def round_risk_penalty(
+    player,
+    draft_state
+):
 
-    run_bonus = 0
-    if player.position in runs:
-        run_bonus = 20 if runs[player.position] == "HOT_RUN" else 8
+    current_round = (
+        draft_state.current_pick
+        // 10
+    ) + 1
 
-    # Final Score
-    score = base + value_over_replacement + run_bonus + (cliff * 30)
+    if current_round <= 3:
+        return (
+            player.risk * 3
+        )
 
-    # multiplicative decision layer
-    score *= (1 + need * 1.5)
-    score *= (1 + scarcity * 1.2)
+    if current_round <= 7:
+        return (
+            player.risk * 2
+        )
 
-    return score
+    return (
+        player.risk * 1
+    )
+
+
+def calculate_draft_score(
+    player,
+    draft_state,
+    all_players,
+    team_id=0
+):
+
+    talent = talent_score(
+        player,
+        all_players
+    )
+
+    need_modifier = (
+        get_team_need_modifier(
+            player,
+            draft_state,
+            team_id
+        )
+    )
+
+    pressure = tier_pressure(
+        player,
+        all_players,
+        draft_state
+    )
+
+    run = run_bonus(
+        player,
+        draft_state
+    )
+
+    risk_penalty = (
+        round_risk_penalty(
+            player,
+            draft_state
+        )
+    )
+
+    score = (
+        talent
+        * need_modifier
+    )
+
+    score += pressure
+    score += run
+    score -= risk_penalty
+
+    return round(score, 2)
