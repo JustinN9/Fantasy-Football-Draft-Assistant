@@ -1,29 +1,44 @@
-from engine.positional_runs import detect_positional_runs
+from engine.positional_runs import (
+    detect_positional_runs
+)
+
+from engine.lookahead import (
+    calculate_lookahead_value
+)
 
 
 TEAM_NEED_CURVES = {
     "QB": [1.0, 0.08, 0.01],
-    "RB": [1.0, 0.95, 0.82, 0.65, 0.42, 0.22],
+    "RB": [1.0, 0.98, 0.90, 0.72, 0.50, 0.28],
     "WR": [1.0, 0.94, 0.84, 0.70, 0.48, 0.28],
     "TE": [1.0, 0.18, 0.04]
 }
 
 
 POSITION_WEIGHTS = {
-    "QB": 0.72,
-    "RB": 1.15,
-    "WR": 1.12,
-    "TE": 0.90
+    "QB": 0.50,
+    "RB": 1.22,
+    "WR": 1.10,
+    "TE": 0.88
 }
 
 
-def normalize(value, min_val, max_val):
+def normalize(
+    value,
+    min_val,
+    max_val
+):
     if max_val == min_val:
         return 50
 
     return (
-        (value - min_val)
-        / (max_val - min_val)
+        (
+            value - min_val
+        )
+        /
+        (
+            max_val - min_val
+        )
     ) * 100
 
 
@@ -32,7 +47,11 @@ def get_team_need_modifier(
     draft_state,
     team_id
 ):
-    roster = draft_state.get_team_roster(team_id)
+    roster = (
+        draft_state.get_team_roster(
+            team_id
+        )
+    )
 
     counts = {
         "QB": 0,
@@ -42,24 +61,28 @@ def get_team_need_modifier(
     }
 
     for p in roster:
-        if p.position in counts:
-            counts[p.position] += 1
+        counts[p.position] += 1
 
-    curve = TEAM_NEED_CURVES.get(
-        player.position,
-        [1.0]
+    curve = (
+        TEAM_NEED_CURVES[
+            player.position
+        ]
     )
 
-    count = counts[player.position]
+    current_count = (
+        counts[player.position]
+    )
 
-    if count >= len(curve):
+    if current_count >= len(curve):
         return curve[-1]
 
-    return curve[count]
+    return curve[current_count]
 
 
-def talent_score(player, all_players):
-
+def talent_score(
+    player,
+    all_players
+):
     vbds = [
         p.vbd
         for p in all_players
@@ -76,21 +99,19 @@ def talent_score(player, all_players):
         player.upside * 10
     )
 
-    talent = (
-        vbd_norm * 0.78
-        + upside_score * 0.22
+    score = (
+        vbd_norm * 0.80
+        + upside_score * 0.20
     )
 
-    position_weight = (
+    score *= (
         POSITION_WEIGHTS.get(
             player.position,
             1.0
         )
     )
 
-    talent *= position_weight
-
-    return talent
+    return score
 
 
 def tier_pressure(
@@ -98,7 +119,6 @@ def tier_pressure(
     all_players,
     draft_state
 ):
-
     remaining = [
         p for p in all_players
         if (
@@ -135,9 +155,10 @@ def run_bonus(
     player,
     draft_state
 ):
-
-    runs = detect_positional_runs(
-        draft_state
+    runs = (
+        detect_positional_runs(
+            draft_state
+        )
     )
 
     signal = runs.get(
@@ -153,31 +174,6 @@ def run_bonus(
     return bonuses.get(
         signal,
         0
-    )
-
-
-def round_risk_penalty(
-    player,
-    draft_state
-):
-
-    current_round = (
-        draft_state.current_pick
-        // 10
-    ) + 1
-
-    if current_round <= 3:
-        return (
-            player.risk * 3
-        )
-
-    if current_round <= 7:
-        return (
-            player.risk * 2
-        )
-
-    return (
-        player.risk * 1
     )
 
 
@@ -212,11 +208,17 @@ def calculate_draft_score(
         draft_state
     )
 
-    risk_penalty = (
-        round_risk_penalty(
+    lookahead = (
+        calculate_lookahead_value(
             player,
-            draft_state
+            draft_state,
+            all_players,
+            team_id
         )
+    )
+
+    risk_penalty = (
+        player.risk * 2
     )
 
     score = (
@@ -226,6 +228,7 @@ def calculate_draft_score(
 
     score += pressure
     score += run
+    score += lookahead
     score -= risk_penalty
 
     return round(score, 2)

@@ -172,23 +172,6 @@ def run_debug_simulation():
                     )
                 )
 
-                print(
-                    "\nAI "
-                    "RECOMMENDATIONS:"
-                )
-
-                for (
-                    player,
-                    score
-                ) in recommendations:
-
-                    print(
-                        f"{player.name} "
-                        f"({player.position}) "
-                        f"| Score: "
-                        f"{round(score, 2)}"
-                    )
-
                 pick = get_cpu_pick(
                     available_players,
                     draft_state,
