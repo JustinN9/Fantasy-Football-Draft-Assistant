@@ -1,40 +1,46 @@
-from engine.scoring import (
-    calculate_draft_score
-)
+from engine.scoring import calculate_draft_score
+from engine.explanations import explain_pick
 
 
-def get_recommendations(
-    players,
-    draft_state,
-    top_n=5,
-    team_id=0
-):
+def get_recommendations(player_pool, draft_state, all_players, team_id=0, top_n=5):
+    """
+    Returns ranked players with explanations.
+    """
 
-    available = [
-        p for p in players
-        if not draft_state.is_drafted(p)
-    ]
+    scored_players = []
 
-    scored = []
-
-    for player in available:
-
-        score = (
-            calculate_draft_score(
-                player,
-                draft_state,
-                available,
-                team_id
-            )
+    for player in player_pool:
+        score = calculate_draft_score(
+            player,
+            draft_state,
+            all_players,
+            team_id
         )
 
-        scored.append(
-            (player, score)
+        reasons = explain_pick(
+            player,
+            draft_state,
+            all_players,
+            team_id
         )
 
-    scored.sort(
-        key=lambda x: x[1],
-        reverse=True
-    )
+        scored_players.append({
+            "player": player,
+            "score": score,
+            "reasons": reasons
+        })
 
-    return scored[:top_n]
+    scored_players.sort(key=lambda x: x["score"], reverse=True)
+
+    return scored_players[:top_n]
+
+
+def print_recommendations(recommendations):
+    for r in recommendations:
+        p = r["player"]
+        print("\n--------------------")
+        print(f"{p.name} ({p.position}) - Score: {r['score']}")
+        print("Why:")
+
+        for reason in r["reasons"]:
+            print(f" - {reason}")

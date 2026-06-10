@@ -6,34 +6,25 @@ from models.draft_state import DraftState
 NUM_ROUNDS = 4
 NUM_TEAMS = 10
 
+
 def print_team_rosters(draft_state):
 
     print("\nCURRENT ROSTERS")
 
     for team_id in range(NUM_TEAMS):
 
-        roster = draft_state.get_team_roster(
-            team_id
-        )
+        roster = draft_state.get_team_roster(team_id)
 
         formatted = []
 
         for player in roster:
             formatted.append(
-                f"{player.name} "
-                f"({player.position})"
+                f"{player.name} ({player.position})"
             )
 
-        roster_text = (
-            ", ".join(formatted)
-            if formatted
-            else "Empty"
-        )
+        roster_text = ", ".join(formatted) if formatted else "Empty"
 
-        print(
-            f"Team {team_id}: "
-            f"{roster_text}"
-        )
+        print(f"Team {team_id}: {roster_text}")
 
 
 def get_cpu_pick(
@@ -67,110 +58,63 @@ def run_debug_simulation():
 
     players = load_players()
 
-    print(
-        f"Loaded "
-        f"{len(players)} players"
-    )
+    print(f"Loaded {len(players)} players")
 
-    print(
-        "\nSTARTING "
-        "4-ROUND DRAFT "
-        "SIMULATION\n"
-    )
+    print("\nSTARTING 4-ROUND DRAFT SIMULATION\n")
 
-    draft_state = DraftState(
-        num_teams=NUM_TEAMS
-    )
+    draft_state = DraftState(num_teams=NUM_TEAMS)
 
-    available_players = (
-        players.copy()
-    )
+    available_players = players.copy()
 
     direction = 1
 
-    for round_num in range(
-        1,
-        NUM_ROUNDS + 1
-    ):
+    for round_num in range(1, NUM_ROUNDS + 1):
 
-        print(
-            f"\n{'=' * 18} "
-            f"ROUND {round_num} "
-            f"{'=' * 18}\n"
-        )
+        print(f"\n{'=' * 18} ROUND {round_num} {'=' * 18}\n")
 
         if direction == 1:
-            order = list(
-                range(NUM_TEAMS)
-            )
+            order = list(range(NUM_TEAMS))
         else:
-            order = list(
-                range(
-                    NUM_TEAMS - 1,
-                    -1,
-                    -1
-                )
-            )
+            order = list(range(NUM_TEAMS - 1, -1, -1))
 
         for team_id in order:
 
-            print(
-                f"\n--- TEAM "
-                f"{team_id} "
-                f"ON THE CLOCK ---"
-            )
+            print(f"\n--- TEAM {team_id} ON THE CLOCK ---")
+
+            pick = None
 
             # USER TEAM
             if team_id == 0:
 
-                recommendations = (
-                    get_recommendations(
-                        available_players,
-                        draft_state,
-                        top_n=5
-                    )
+                recommendations = get_recommendations(
+                    available_players,
+                    draft_state,
+                    players,     # FIX: all_players added
+                    team_id,
+                    top_n=5
                 )
 
-                print(
-                    "\nAI "
-                    "RECOMMENDATIONS:"
-                )
+                print("\nAI RECOMMENDATIONS:")
 
-                for (
-                    player,
-                    score
-                ) in recommendations:
+                for r in recommendations:
+                    player = r["player"]
+                    score = r["score"]
+                    reasons = r["reasons"]
 
                     print(
-                        f"{player.name} "
-                        f"({player.position}) "
-                        f"| Score: "
-                        f"{round(score, 2)}"
+                        f"{player.name} ({player.position}) | Score: {round(score, 2)}"
                     )
 
-                pick = (
-                    recommendations[0][0]
-                    if recommendations
-                    else None
-                )
+                    for reason in reasons:
+                        print(f"   - {reason}")
+
+                pick = recommendations[0]["player"] if recommendations else None
 
                 if pick:
-                    print(
-                        f"\nAI PICKS: "
-                        f"{pick.name} "
-                        f"({pick.position})"
-                    )
+                    print(f"\nAI PICKS: {pick.name} ({pick.position})")
 
             # CPU TEAM
             else:
-
-                recommendations = (
-                    get_recommendations(
-                        available_players,
-                        draft_state,
-                        top_n=5
-                    )
-                )
 
                 pick = get_cpu_pick(
                     available_players,
@@ -180,35 +124,19 @@ def run_debug_simulation():
                 )
 
                 if pick:
-                    print(
-                        f"CPU PICKS: "
-                        f"{pick.name} "
-                        f"({pick.position})"
-                    )
+                    print(f"CPU PICKS: {pick.name} ({pick.position})")
 
             if pick is None:
                 continue
 
-            draft_state.draft_player(
-                pick,
-                team_id
-            )
+            draft_state.draft_player(pick, team_id)
+            available_players.remove(pick)
 
-            available_players.remove(
-                pick
-            )
-
-        print_team_rosters(
-            draft_state
-        )
+        print_team_rosters(draft_state)
 
         direction *= -1
 
-    print(
-        f"\n{'=' * 18} "
-        f"DRAFT COMPLETE "
-        f"{'=' * 18}"
-    )
+    print(f"\n{'=' * 18} DRAFT COMPLETE {'=' * 18}")
 
 
 if __name__ == "__main__":
