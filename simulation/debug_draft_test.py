@@ -1,6 +1,14 @@
+import random
+
 from data.loader import load_players
 from engine.recommendations import get_recommendations
-from engine.cpu_logic import cpu_score
+from engine.scoring import calculate_draft_score
+
+from engine.cpu_personalities import (
+    get_cpu_personality,
+    apply_personality_modifier
+)
+
 from models.draft_state import DraftState
 
 NUM_ROUNDS = 4
@@ -15,40 +23,50 @@ def print_team_rosters(draft_state):
 
         roster = draft_state.get_team_roster(team_id)
 
-        formatted = []
+        formatted = [
+            f"{p.name} ({p.position})"
+            for p in roster
+        ]
 
-        for player in roster:
-            formatted.append(
-                f"{player.name} ({player.position})"
-            )
-
-        roster_text = ", ".join(formatted) if formatted else "Empty"
-
-        print(f"Team {team_id}: {roster_text}")
+        print(f"Team {team_id}: {', '.join(formatted) if formatted else 'Empty'}")
 
 
 def get_cpu_pick(
     available_players,
     draft_state,
-    current_pick,
+    all_players,
     team_id
 ):
+
+    personality = get_cpu_personality(team_id)
 
     best_player = None
     best_score = float("-inf")
 
     for player in available_players:
 
-        score = cpu_score(
+        base_score = calculate_draft_score(
             player,
             draft_state,
-            available_players,
-            current_pick,
+            all_players,
             team_id
         )
 
-        if score > best_score:
-            best_score = score
+        final_score = apply_personality_modifier(
+            player,
+            base_score,
+            personality
+        )
+
+        # Tie-breaking randomness (important for variation)
+        if (
+            final_score > best_score
+            or (
+                abs(final_score - best_score) < 0.5
+                and random.random() < 0.5
+            )
+        ):
+            best_score = final_score
             best_player = player
 
     return best_player
@@ -77,6 +95,9 @@ def run_debug_simulation():
         else:
             order = list(range(NUM_TEAMS - 1, -1, -1))
 
+        # Optional realism: slight shuffle within round order
+        random.shuffle(order)
+
         for team_id in order:
 
             print(f"\n--- TEAM {team_id} ON THE CLOCK ---")
@@ -89,7 +110,7 @@ def run_debug_simulation():
                 recommendations = get_recommendations(
                     available_players,
                     draft_state,
-                    players,     # FIX: all_players added
+                    players,
                     team_id,
                     top_n=5
                 )
@@ -101,9 +122,7 @@ def run_debug_simulation():
                     score = r["score"]
                     reasons = r["reasons"]
 
-                    print(
-                        f"{player.name} ({player.position}) | Score: {round(score, 2)}"
-                    )
+                    print(f"{player.name} ({player.position}) | Score: {round(score, 2)}")
 
                     for reason in reasons:
                         print(f"   - {reason}")
@@ -113,18 +132,19 @@ def run_debug_simulation():
                 if pick:
                     print(f"\nAI PICKS: {pick.name} ({pick.position})")
 
-            # CPU TEAM
+            # CPU TEAMS
             else:
 
                 pick = get_cpu_pick(
                     available_players,
                     draft_state,
-                    draft_state.current_pick,
+                    players,
                     team_id
                 )
 
                 if pick:
-                    print(f"CPU PICKS: {pick.name} ({pick.position})")
+                    personality = get_cpu_personality(team_id)
+                    print(f"CPU PICKS: {pick.name} ({pick.position}) [{personality}]")
 
             if pick is None:
                 continue
